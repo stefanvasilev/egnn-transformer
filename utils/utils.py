@@ -26,7 +26,9 @@ def get_model(args: Namespace) -> nn.Module:
             out_node_nf=num_out,
             n_layers=args.num_layers,
         )
-
+    elif args.model_name == 'esa':
+        from models.esa_jax import EGNN
+        model = EGNN(hidden_nf=args.num_hidden, out_node_nf=num_out, in_edge_nf=1, n_layers=args.num_layers)
     else:
         raise ValueError(f"Model type {args.model_name} not recognized.")
 
