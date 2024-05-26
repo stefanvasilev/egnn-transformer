@@ -235,6 +235,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--max_samples", type=int, default=3000)
+    parser.add_argument(
+        "--use_pos", action="store_true", help="Whether to use positional encodings"
+    )
+    parser.add_argument(
+        "--normalize",
+        action="store_true",
+        help="Whether to use normalization for positional encodings",
+    )
 
     parsed_args = parser.parse_args()
 

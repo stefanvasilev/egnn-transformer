@@ -8,7 +8,7 @@ This blogpost serves as an introduction to our novel implementation of equivaria
 
 This blogpost serves three purposes: 
 1. Explain the ideas of equivariance in transformer networks while also explaining some of the methods used.
-2. Providing an overview of some reproduction results for other methods (i.e., the Equivariant Graph Neural Network).
+2. Provide an overview of some reproduction results for other methods (i.e., the Equivariant Graph Neural Network).
 3. Give an overview of our method and a comparison with the aforementioned reproduction results.
 
 ---
@@ -71,7 +71,7 @@ This idea of using the distances during computation forms one of the bases of ou
 
 ## **<a name="architecture">Equivariant Transformers</a>**
 
-Our method of improving this architecture would be to leverage the capabilites of transformers \[6\]. The key difference between these and GNNs is that the former treats the entire input as a fully-connected graph. This would typically make transformers less-suited , though many papers have been published which demonstrate their effectivity in handling these tasks \[7\]. 
+Our method of improving the aforementioned architecture would be to leverage the capabilites of transformers \[6\]. The key difference between these and GNNs is that the former treats the entire input as a fully-connected graph. This would typically make transformers less-suited, though many papers have been published which demonstrate their effectivity in handling these tasks \[7\]. 
 
 As our contribution to the field, we introduce a dual encoder system. The first one contains all the node features and normalized distances to the molecule's center of mass, while the other exclusively encodes the edge features (i.e., bond type) and an edge length feature. 
 
@@ -85,7 +85,7 @@ $$\begin{align}
 Now we can begin with the actual approach. We first use an edge encoder with $p$ transformer layers on the data to transform the edge features into the node space. Then, we obtain $K^p_e$, $V^p_e$ and perform the following attention operation:
 
 $$\begin{align} 
-Z^p_e = \frac{softmax(Q^p_e K^{pT}_n + M) V^p_n}{\sqrt(d)}, \qquad \qquad \text{(Equation 9)}
+Z^p_e = \frac{softmax(Q^p_e K^{pT}_n + M) V^p_n}{\sqrt{d}}, \qquad \qquad \text{(Equation 9)}
 \end{align}$$
 
 where the output $Z^p_e$ is a matrix of size $n \times d$ (due to the cross-attention) which contains edge encoded information in the node space for every node and $M$ is an adjacency matrix mask of size $n \times e$ where all connections are 0's and non-connections are $-\infty$ to prohibit the attention from attending to non-connected edges. Furthermore, for all layers $< p$, only the edge queries, keys, and values are used, thus no mask is required here. Meanwhile, in the $p$-th layer, we limit the attention to only the connected nodes to calculate the edge features for every node in order to use the node keys. Lastly, the final division after softmaxing by the dimension size $\sqrt(d)$ is to normalize the output scale, a method employed by most other transfomer architectures.
@@ -93,18 +93,20 @@ where the output $Z^p_e$ is a matrix of size $n \times d$ (due to the cross-atte
 Now, we need to obtain the node encodings, which is done through the following: 
 
 $$\begin{align} 
-Z^r_n = \frac{softmax(Q^r_n K^{rT}_n) V^n_r}{\sqrt(d)}, \qquad \qquad \text{(Equation 10)}
+Z^r_n = \frac{softmax(Q^r_n K^{rT}_n) V^n_r}{\sqrt{d}}, \qquad \qquad \text{(Equation 10)}
 \end{align}$$
 
-where $Z^r_n$ is the output of layer $r$, which is the encoder's last layer. Also, similar to the previous formula, we also control the output magnitude by dividing by $\sqrt(d)$.
+where $Z^r_n$ is the output of layer $r$, which is the encoder's last layer. Also, similar to the previous formula, we also control the output magnitude by dividing by $\sqrt{d}$.
 
-Now that we have both the node and edge features encoded, we can simply sum these encodings to combine them together:
+As we now have both the node and edge features encoded, we can simply sum these encodings to combine them together:
 
 $$\begin{align} 
 Z^0_j &= Z^p_e + Z^r_n, \qquad \qquad \text{(Equation 11)}
 \end{align}$$
 
-where $Z^0_j$ is the input for a join encoder $Z^j$. This operation can alternatively be interpreted as a residual connection in the node space, where $Z^r_n$ is the residual connection. After this operation, we continue the computation with an $h$-layer joint encoder and get the output $Z^h_j$. One final note is that we have a [CLS] token which is used for classification in the $Z^0_j$ or the $Z^0_n$ input.
+where $Z^0_j$ is the input for a join encoder $Z^j$. This operation can alternatively be interpreted as a residual connection in the node space, where $Z^r_n$ is the residual connection. Afterwards, we continue the computation with an $h$-layer joint encoder and get the output $Z^h_j$. One final note is that we have a [CLS] token which is used for classification in the $Z^0_j$ or the $Z^0_n$ input.
+
+Our dual encoder system is equivariant is through encoding normalized distances to the molecule's center of mass and edge lengths, ensuring that the features are invariant to translations and rotations of the molecule. In addition, the attention mechanism in our transformers uses adjacency masking to ensure that attention is only paid to connected nodes and edges, which inherently respects the graph structure and maintains the relative positional information between nodes and edges. Finally, as a unique benefit of this approach, we allow for flexibility in regards to the way we accept and process inputs, due to being able to focus either only on the nodes or also the edges.
 
 
 ## **<a name="architecture">Evaluating the Models</a>**
@@ -112,7 +114,7 @@ where $Z^0_j$ is the input for a join encoder $Z^j$. This operation can alternat
 As a baseline, we compare our dual encoder transformer to varying architectures, with the first being from \[5\] as it is generally the best performing model. In addition, we also show the baseline performance reported in QM9 to show how our transformer fares with other transformer methods, specifically compared with that of \[7\] as it outperforms many other implementations in the benchmarks tasks (i.e., QM9) due to utilizing radial basis functions to expand the interatomic distances and adjusting the transformer operations to acommodate to these modified distances naturally.
 <!-- This is just an idea, because I'm not sure if we'll have enough time to handle running the other transformers. - Greg -->
 
-For all the aforementioned methods except TorchMD-Net (due to time constraints), we evaluate and reproduce their performance on the QM9 \[12, 13\] and N-body \[14\] datasets. The former is used to evaluate the model performances on invariant tasks due to only requiring property predictions. Meanwhile, the latter is to test how well each model can handle equivariance in the data.
+For all the aforementioned methods except TorchMD-Net (due to time constraints), we evaluate and reproduce their performance on the QM9 \[12, 13\] and N-body \[14\] datasets. The former is a task which involves predicting quantum chemical properties (at DFT level) of small organic molecules and is used to evaluate the model performances on invariant tasks due to only requiring property predictions. Meanwhile, the latter is to test how well each model can handle equivariance in the data, as it involves predicting the positions of particles depending on the charges and velocities.
 
 ## **<a name="reproduction">Reproduction of the Experiments</a>**
 <!-- 

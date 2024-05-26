@@ -7,10 +7,15 @@ import jax.numpy as jnp
 class NBodyDataset:
     """
     NBodyDataset
-
     """
 
-    def __init__(self, partition="train", max_samples=1e8, dataset_name="nbody_small"):
+    def __init__(
+        self,
+        partition="train",
+        max_samples=1e8,
+        dataset_name="nbody_small",
+        normalize=True,
+    ):
         self.partition = partition
         if self.partition == "val":
             self.sufix = "valid"
@@ -26,6 +31,7 @@ class NBodyDataset:
 
         self.max_samples = int(max_samples)
         self.dataset_name = dataset_name
+        self.normalize = normalize
         self.data, self.edges = self.load()
 
     def load(self):
@@ -35,6 +41,7 @@ class NBodyDataset:
         charges = np.load("n_body/dataset/data/charges_" + self.sufix + ".npy")
 
         loc, vel, edge_attr, edges, charges = self.preprocess(loc, vel, edges, charges)
+
         return (loc, vel, edge_attr, charges), edges
 
     def preprocess(self, loc, vel, edges, charges):
@@ -54,6 +61,16 @@ class NBodyDataset:
                     edge_attr.append(edges[:, i, j])
                     rows.append(i)
                     cols.append(j)
+
+        # Distance to center of mass enrichmnent
+        node_dists = torch.linalg.vector_norm(
+            loc - loc.mean(axis=2, keepdims=True), axis=-1, keepdims=True
+        )
+        if self.normalize:
+            node_dists /= node_dists.max()
+
+        loc = torch.cat((loc, node_dists), dim=-1)
+
         edges = [rows, cols]
         # swap n_nodes <--> batch_size and add nf dimension
         edge_attr = np.array(edge_attr)
@@ -80,10 +97,13 @@ class NBodyDataset:
 
         if self.dataset_name == "nbody":
             frame_0, frame_T = 6, 8
+
         elif self.dataset_name == "nbody_small":
             frame_0, frame_T = 30, 40
+
         elif self.dataset_name == "nbody_small_out_dist":
             frame_0, frame_T = 20, 30
+
         else:
             raise Exception("Wrong dataset partition %s" % self.dataset_name)
 
@@ -96,14 +116,17 @@ class NBodyDataset:
         edges = [jnp.array(self.edges[0]), jnp.array(self.edges[1])]
         if batch_size == 1:
             return edges
+
         elif batch_size > 1:
             rows, cols = [], []
             for i in range(batch_size):
                 rows.append(edges[0] + n_nodes * i)
                 cols.append(edges[1] + n_nodes * i)
             edges = [jnp.concatenate(rows), jnp.concatenate(cols)]
+
         return edges
 
 
 if __name__ == "__main__":
+
     NBodyDataset()

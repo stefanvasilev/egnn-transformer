@@ -27,6 +27,7 @@ class NodeDistance:
         if self.normalize:
             node_com_distances = node_com_distances / node_com_distances.max()
         data.x = torch.cat([data.x, node_com_distances], dim=-1)
+
         return data
 
 
@@ -66,20 +67,22 @@ def get_model(args: Namespace) -> nn.Module:
             out_node_nf=num_out,
             n_layers=args.num_layers,
         )
-    if args.model_name  =="transformer":
+
+    elif args.model_name == "transformer":
         from models.transformer import EGNNTransformer
 
         model = EGNNTransformer(
             num_edge_encoder_blocks=args.num_edge_encoders,
             num_node_encoder_blocks=args.num_node_encoders,
-            num_combined_encoder_blocks= args.num_combined_encoder_blocks,
-
+            num_combined_encoder_blocks=args.num_combined_encoder_blocks,
             model_dim=args.dim,
             num_heads=args.heads,
             dropout_prob=args.dropout,
-            edge_input_dim= args.edge_input_dim,
-            node_input_dim= args.node_input_dim,
+            edge_input_dim=args.edge_input_dim,
+            node_input_dim=args.node_input_dim,
+            use_pos=args.use_pos,
         )
+
     else:
         raise ValueError(f"Model type {args.model_name} not recognized.")
 
@@ -121,6 +124,7 @@ def get_loaders(
                 batch_size=args.batch_size,
                 collate_fn=collate_fn,
             )
+
         else:
             train_loader = GDataLoader(
                 dataset[:num_train],
@@ -141,8 +145,10 @@ def get_loaders(
                 drop_last=True,
                 pin_memory=True,
             )
+
     elif args.dataset == "charged":
         train_loader, val_loader, test_loader = get_nbody_dataloaders(args)
+
     else:
         raise ValueError(f"Dataset {args.dataset} not recognized.")
 
