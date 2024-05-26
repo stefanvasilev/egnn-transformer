@@ -168,3 +168,6 @@ if __name__ == "__main__":
 
     # Now you can use the model's `apply` method with these parameters
     output = egnn.apply({"params": params}, h, x, edges, edge_attr, batch_index)
+    print(output[0].shape, output[1].shape)
+    print(output[0])
+    print(output[1])
