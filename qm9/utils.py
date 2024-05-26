@@ -25,10 +25,11 @@ def GraphTransform(property_idx) -> Callable:
         pos = jax_data['pos']
         edge_indices = jax_data['edge_index']
         edge_attr = jax_data['edge_attr'] if 'edge_attr' in jax_data else None
+        batch_index = jax_data['batch'] if 'batch' in jax_data else None
         targets = jax_data['y'][:, property_idx]  # Select property to optimize for
         targets = targets.reshape(-1,1)
 
-        return (nodes, pos, edge_indices, edge_attr), targets
+        return (nodes, pos, edge_indices, edge_attr, batch_index), targets
     
     return _to_jax
 

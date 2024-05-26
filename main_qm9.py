@@ -97,12 +97,11 @@ def update(
     params,
     feat,
     target: jnp.ndarray,
-    node_mask,
     opt_state: optax.OptState,
     loss_fn: Callable,
     opt_update: Callable,
 ):
-    loss, grads = jax.value_and_grad(loss_fn)(params, feat, target, node_mask=node_mask)
+    loss, grads = jax.value_and_grad(loss_fn)(params, feat, target)
     updates, opt_state = opt_update(grads, opt_state, params)
     return loss, optax.apply_updates(params, updates), opt_state
 
@@ -183,29 +182,29 @@ def denormalize(pred, meann, mad):
     return mad * pred + meann
 
 @partial(jax.jit, static_argnames=["model_fn", "task", "training"])
-def l1_loss(params, feat, target, model_fn, meann, mad, node_mask, training=True, task="graph"):
-    h, x, edges, edge_attr = feat
-    pred = model_fn(params, h, x, edges, edge_attr)[0]
+def l1_loss(params, feat, target, model_fn, meann, mad, training=True, task="graph"):
+    h, x, edges, edge_attr, batch_index = feat
+    pred = model_fn(params, h, x, edges, edge_attr, batch_index)[0]
     # Normalize prediction and target for training
     target = normalize(target, meann, mad) if training else target
     pred = normalize(pred, meann, mad) if training else pred
 
-    target_padded = jnp.pad(target, ((0, h.shape[0] - target.shape[0]), (0, 0)), mode='constant')
+    #target_padded = jnp.pad(target, ((0, h.shape[0] - target.shape[0]), (0, 0)), mode='constant')
     
     # Apply the mask to the predictions and targets
-    pred = pred * node_mask[:, None]
-    target_padded = target_padded * node_mask[:, None]
+    #pred = pred * node_mask[:, None]
+    #target_padded = target_padded * node_mask[:, None]
 
-    assert pred.shape == target_padded.shape, f"Shape mismatch: pred.shape = {pred.shape}, target_padded.shape = {target_padded.shape}"
-    return jnp.mean(jnp.abs(pred - target_padded))
+    assert pred.shape == target.shape, f"Shape mismatch: pred.shape = {pred.shape}, target_padded.shape = {target.shape}"
+    return jnp.mean(jnp.abs(pred - target))
 
 def evaluate(loader, params, loss_fn, graph_transform, meann, mad, task="graph"):
     eval_loss = 0.0
     for data in loader:
         feat, target = graph_transform(data)
-        h, x, edges, edge_attr = feat
-        node_mask = create_padding_mask(h, x, edges, edge_attr)
-        loss = jax.lax.stop_gradient(loss_fn(params, feat, target, node_mask=node_mask, meann=meann, mad=mad, training=False))
+        #h, x, edges, edge_attr, batch_index = feat
+        #node_mask = create_padding_mask(h, x, edges, edge_attr)
+        loss = jax.lax.stop_gradient(loss_fn(params, feat, target, meann=meann, mad=mad, training=False))
         eval_loss += jax.block_until_ready(loss)
     return eval_loss / len(loader)
 
@@ -270,12 +269,12 @@ def train_model(args, model, graph_transform, model_name, checkpoint_path):
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}", leave=False):
         #for batch_idx, batch in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}", leave=False)):
             feat, target = graph_transform_fn(batch)
-            h, x, edges, edge_attr = feat
-            node_mask = create_padding_mask(h, x, edges, edge_attr)
+            #h, x, edges, edge_attr, batch_index = feat
+            #node_mask = create_padding_mask(h, x, edges, edge_attr)
             #if batch_idx % 10 == 0:
             #    debug_step(params, feat, target, node_mask, model.apply, meann, mad)
 
-            loss, params, opt_state = update_fn(params=params, feat=feat, target=target, node_mask=node_mask, opt_state=opt_state)
+            loss, params, opt_state = update_fn(params=params, feat=feat, target=target, opt_state=opt_state)
             train_loss += loss
         train_loss /= len(train_loader)
         train_scores.append(train_loss)

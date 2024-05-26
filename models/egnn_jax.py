@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
-
+from jax.lax import scatter_add
 
 def xavier_init(gain):
     def init(key, shape, dtype):
@@ -93,12 +93,13 @@ class EGNN(nn.Module):
     residual: bool = True
 
     @nn.compact
-    def __call__(self, h, x, edges, edge_attr):
+    def __call__(self, h, x, edges, edge_attr, batch_index):
         h = nn.Dense(self.hidden_nf)(h)
         for i in range(self.n_layers):
             h, x, _ = E_GCL(self.hidden_nf, act_fn=self.act_fn, residual=self.residual)(
                 h, edges, x, edge_attr=edge_attr
             )  # name=f"gcl_{i}"
+        h = unsorted_segment_sum(h, batch_index, num_segments=batch_index.max()+1)
         h = nn.Dense(self.out_node_nf)(h)
         return h, x
 
