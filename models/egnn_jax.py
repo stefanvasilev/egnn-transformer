@@ -154,16 +154,17 @@ if __name__ == "__main__":
     x_dim = 3
 
     # Dummy variables h, x and fully connected edges
-    h = jnp.ones((batch_size * n_nodes, n_feat))
-    x = jnp.ones((batch_size * n_nodes, x_dim))
+    h = jnp.ones((10, n_feat))
+    x = jnp.ones((10, x_dim))
     edges, edge_attr = get_edges_batch(n_nodes, batch_size)
+    batch_index = jnp.array([0, 0, 0, 0, 1, 1, 1, 2, 3, 3])
 
     rng = jax.random.PRNGKey(42)
 
     # Initialize EGNN
     egnn = EGNN(hidden_nf=32, out_node_nf=1)
 
-    params = egnn.init(rng, h, x, edges, edge_attr)["params"]
+    params = egnn.init(rng, h, x, edges, edge_attr, batch_index)["params"]
 
     # Now you can use the model's `apply` method with these parameters
-    output = egnn.apply({"params": params}, h, x, edges, edge_attr)
+    output = egnn.apply({"params": params}, h, x, edges, edge_attr, batch_index)
