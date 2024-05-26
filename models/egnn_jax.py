@@ -99,7 +99,7 @@ class EGNN(nn.Module):
             h, x, _ = E_GCL(self.hidden_nf, act_fn=self.act_fn, residual=self.residual)(
                 h, edges, x, edge_attr=edge_attr
             )  # name=f"gcl_{i}"
-        h = unsorted_segment_sum(h, batch_index, num_segments=batch_index.max()+1)
+        h = unsorted_segment_sum(h, batch_index, num_segments=batch_index.max().item()+1)
         h = nn.Dense(self.out_node_nf)(h)
         return h, x
 
