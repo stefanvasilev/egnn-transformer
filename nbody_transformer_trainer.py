@@ -177,6 +177,8 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument(
         "--lr-scheduling", action="store_true", help="Use learning rate scheduling"
+
+
     )
     parser.add_argument("--weight_decay", type=float, default=1e-8, help="Weight decay")
     parser.add_argument(
@@ -209,7 +211,8 @@ if __name__ == "__main__":
     )
     parser.add_argument('--train_from_checkpoint', action='store_true', default=False,
                         help='Enables training form checkpoint')
-
+    parser.add_argument('--node_only', action='store_true', default=False,
+                        help='Enables training form checkpoint')
     # Model parameters
     parser.add_argument(
         "--num_edge_encoders", type=int, default=1, help="Number of edge encoder blocks"
