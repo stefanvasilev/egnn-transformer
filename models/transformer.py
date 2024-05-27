@@ -297,7 +297,7 @@ class EGNNTransformer(nn.Module):
 
     input_dropout_prob: float = 0.0
 
-    use_pos: bool = True
+    use_pos: bool = False
     predict_pos: bool = False
 
     def setup(self):
