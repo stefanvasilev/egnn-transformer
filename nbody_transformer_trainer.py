@@ -121,17 +121,17 @@ def train_model(args, model, model_name, graph_transform, checkpoint_path):
 
         if epoch % args.val_freq == 0:
             val_loss = evaluate(val_loader, params, rng, model.apply)
-            val_scores.append(float(jax.device_get(val_loss)))
             print(
                 f"[Epoch {epoch + 1:2d}] Training loss: {train_loss:.6f}, Validation loss: {val_loss:.6f}"
             )
-
-            if len(val_scores) == 1 or val_loss < min(val_scores):
+            if len(val_scores) < 2 or val_loss < min(val_scores):
                 print("\t   (New best performance, saving model...)")
                 save_model(params, checkpoint_path, model_name)
                 best_val_epoch = len(val_scores) - 1
                 test_loss = evaluate(test_loader, params, rng, model.apply)
+                print(f"test_loss:{test_loss}")
                 jax.clear_caches()
+            val_scores.append(float(jax.device_get(val_loss)))
 
     if val_scores:
         best_val_epoch = val_scores.index(min(val_scores))
@@ -170,9 +170,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Run parameters
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument(
-        "--batch_size", type=int, default=100, help="Batch size (number of graphs)."
+        "--batch_size", type=int, default=500, help="Batch size (number of graphs)."
     )
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument(
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('--train_from_checkpoint', action='store_true', default=False,
                         help='Enables training form checkpoint')
-    parser.add_argument('--node_only', action='store_true', default=False,
+    parser.add_argument('--node_only', action='store_true', default=True,
                         help='Enables training form checkpoint')
     # Model parameters
     parser.add_argument(
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         default=1,
         help="Number of combined encoder blocks",
     )
-    parser.add_argument("--dim", type=int, default=64, help="Model dimension")
+    parser.add_argument("--dim", type=int, default=128, help="Model dimension")
     parser.add_argument("--heads", type=int, default=8, help="Number of heads")
     parser.add_argument(
         "--dropout", type=float, default=0.1, help="Dropout probability"
