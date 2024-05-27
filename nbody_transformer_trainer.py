@@ -13,7 +13,7 @@ from functools import partial
 from n_body.utils import NbodyGraphTransform
 from qm9.utils import GraphTransform
 from flax.training import checkpoints
-from utils.utils import get_model, get_loaders, set_seed
+from utils.utils import get_model, get_loaders_and_statistics, set_seed
 
 
 # Seeding
@@ -73,7 +73,7 @@ def evaluate(loader, params, rng, model_fn):
 
 
 def train_model(args, model, model_name, graph_transform, checkpoint_path):
-    train_loader, val_loader, test_loader = get_loaders(args, transformer=True)
+    train_loader, val_loader, test_loader = get_loaders_and_statistics(args, transformer=True)
 
     init_feat, _ = graph_transform(next(iter(train_loader)))
     opt_init, opt_update = optax.adamw(
@@ -121,17 +121,17 @@ def train_model(args, model, model_name, graph_transform, checkpoint_path):
 
         if epoch % args.val_freq == 0:
             val_loss = evaluate(val_loader, params, rng, model.apply)
-            val_scores.append(float(jax.device_get(val_loss)))
             print(
                 f"[Epoch {epoch + 1:2d}] Training loss: {train_loss:.6f}, Validation loss: {val_loss:.6f}"
             )
-
-            if len(val_scores) == 1 or val_loss < min(val_scores):
+            if len(val_scores) < 2 or val_loss < min(val_scores):
                 print("\t   (New best performance, saving model...)")
                 save_model(params, checkpoint_path, model_name)
                 best_val_epoch = len(val_scores) - 1
                 test_loss = evaluate(test_loader, params, rng, model.apply)
+                print(f"test_loss:{test_loss}")
                 jax.clear_caches()
+            val_scores.append(float(jax.device_get(val_loss)))
 
     if val_scores:
         best_val_epoch = val_scores.index(min(val_scores))
@@ -170,13 +170,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Run parameters
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument(
-        "--batch_size", type=int, default=100, help="Batch size (number of graphs)."
+        "--batch_size", type=int, default=500, help="Batch size (number of graphs)."
     )
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument(
         "--lr-scheduling", action="store_true", help="Use learning rate scheduling"
+
+
     )
     parser.add_argument("--weight_decay", type=float, default=1e-8, help="Weight decay")
     parser.add_argument(
@@ -209,7 +211,8 @@ if __name__ == "__main__":
     )
     parser.add_argument('--train_from_checkpoint', action='store_true', default=False,
                         help='Enables training form checkpoint')
-
+    parser.add_argument('--node_only', action='store_true', default=True,
+                        help='Enables training form checkpoint')
     # Model parameters
     parser.add_argument(
         "--num_edge_encoders", type=int, default=1, help="Number of edge encoder blocks"
@@ -223,7 +226,7 @@ if __name__ == "__main__":
         default=1,
         help="Number of combined encoder blocks",
     )
-    parser.add_argument("--dim", type=int, default=64, help="Model dimension")
+    parser.add_argument("--dim", type=int, default=128, help="Model dimension")
     parser.add_argument("--heads", type=int, default=8, help="Number of heads")
     parser.add_argument(
         "--dropout", type=float, default=0.1, help="Dropout probability"
@@ -240,8 +243,6 @@ if __name__ == "__main__":
 
     set_seed(parsed_args.seed)
     graph_transform = NbodyGraphTransform(n_nodes=5, batch_size=parsed_args.batch_size, model=parsed_args.model_name)
-    train_loader, val_loader, test_loader = get_loaders(parsed_args, transformer=True)
-    init_feat, a = graph_transform(next(iter(train_loader)))
     model = get_model(parsed_args)
 
     train_model(parsed_args, model, parsed_args.model_name, graph_transform, "assets")
