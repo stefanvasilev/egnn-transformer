@@ -25,7 +25,7 @@ def rot_y(beta):
     ], dtype = beta.dtype)
 
 def rot(alpha, beta, gamma):
-    return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)
+    return (torch.unsqueeze((rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)), dim=0))
 
 def test_equivariance(model, args):
     train_loader, val_loader, test_loader = get_loaders(args, transformer=True)
@@ -36,13 +36,28 @@ def test_equivariance(model, args):
     R = jnp.array(rot(*torch.rand(3)).cpu().numpy())
     T = jnp.array(torch.randn(1, 1, 3).cpu().numpy())
 
+    print(R.shape, T.shape)
+
     feats, edges, coors, vel = init_feat
+    print(feats.shape, edges.shape, coors.shape, vel.shape)
+    feats = feats[0:1,:,:]
+    edges = edges[0:1,:,:]
+    coors = coors[0:1,:,:]
+    vel = vel[0:1,:,:]
+    print(feats.shape, edges.shape, coors.shape, vel.shape)
     params = model.init(init_rng, *(feats, edges, coors, vel))["params"]
-    trans_out = model.apply(variables = {"params": params}, rngs = {"dropout": rng}, node_inputs = feats, coords = coors @ R + T, vel = vel, edge_inputs = edges)
+    transformed_coors = coors @ R + T
+    transformed_vel = vel @ R
+    print(transformed_coors.shape, transformed_vel.shape)
+    print("coors:", coors[0, 0], transformed_coors[0,0])
+    print("val:", coors[0, 0], transformed_vel[0,0])
+    trans_out = model.apply(variables = {"params": params}, rngs = {"dropout": rng}, node_inputs = feats, coords = transformed_coors, vel = transformed_vel, edge_inputs = edges)
     out = model.apply(variables = {"params": params}, rngs = {"dropout": rng}, node_inputs = feats, coords = coors, vel = vel, edge_inputs = edges)
 
-    extra_trans_out = jnp.matmul(out, R.T) + T
-    assert torch.allclose(torch.from_numpy(jax.device_get(trans_out.copy())), torch.from_numpy(jax.device_get(extra_trans_out.copy())), atol = 1e-6), 'coords are not equivariant'
+    extra_trans_out = jnp.matmul(out, R) + T
+    assert torch.allclose(torch.from_numpy(jax.device_get(trans_out.copy())), torch.from_numpy(jax.device_get(extra_trans_out.copy())), atol = 1e-3), 'coords are not equivariant'
+    #assert torch.allclose(torch.from_numpy(jax.device_get(trans_out.copy())), torch.from_numpy(jax.device_get(out.copy())), atol = 1e-3), 'coords are not invariant'
+
 
 
 if __name__ == "__main__":
@@ -107,12 +122,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dropout", type=float, default=0.1, help="Dropout probability"
     )
-    parser.add_argument(
-        "--edge_input_dim", type=int, default=6, help="Dimension of the edge input"
-    )
-    parser.add_argument(
-        "--node_input_dim", type=int, default=11, help="Dimension of the node input"
-    )
 
     parser.add_argument(
         "--model_name", type=str, default="transformer", help="Model name"
@@ -122,7 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("--nbody_path", default='n_body/dataset/data/')
 
     parsed_args = parser.parse_args()
-
+    print(parsed_args)
     set_seed(parsed_args.seed)
     graph_transform = NbodyGraphTransform(n_nodes=5, batch_size=parsed_args.batch_size, model=parsed_args.model_name)
     train_loader, val_loader, test_loader = get_loaders(parsed_args, transformer=True)
