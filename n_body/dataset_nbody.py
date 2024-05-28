@@ -9,6 +9,7 @@ class NBodyDataset:
     NBodyDataset
     """
 
+<<<<<<< HEAD
     def __init__(
         self,
         partition="train",
@@ -16,6 +17,9 @@ class NBodyDataset:
         dataset_name="nbody_small",
         normalize=True,
     ):
+=======
+    def __init__(self, partition="train", max_samples=1e8, dataset_name="nbody_small", base_path='/n_body/dataset/data/'):
+>>>>>>> 233b85159c7a3b5d0fcf2b893bfbb89d9c4ee693
         self.partition = partition
         if self.partition == "val":
             self.sufix = "valid"
@@ -31,14 +35,19 @@ class NBodyDataset:
 
         self.max_samples = int(max_samples)
         self.dataset_name = dataset_name
+<<<<<<< HEAD
         self.normalize = normalize
+=======
+        self.base_path = base_path
+>>>>>>> 233b85159c7a3b5d0fcf2b893bfbb89d9c4ee693
         self.data, self.edges = self.load()
 
+
     def load(self):
-        loc = np.load("n_body/dataset/data/loc_" + self.sufix + ".npy")
-        vel = np.load("n_body/dataset/data/vel_" + self.sufix + ".npy")
-        edges = np.load("n_body/dataset/data/edges_" + self.sufix + ".npy")
-        charges = np.load("n_body/dataset/data/charges_" + self.sufix + ".npy")
+        loc = np.load(self.base_path + "loc_" + self.sufix + ".npy")
+        vel = np.load(self.base_path + "vel_" + self.sufix + ".npy")
+        edges = np.load(self.base_path + "edges_" + self.sufix + ".npy")
+        charges = np.load(self.base_path + "charges_" + self.sufix + ".npy")
 
         loc, vel, edge_attr, edges, charges = self.preprocess(loc, vel, edges, charges)
 
@@ -99,8 +108,12 @@ class NBodyDataset:
             frame_0, frame_T = 6, 8
 
         elif self.dataset_name == "nbody_small":
+<<<<<<< HEAD
             frame_0, frame_T = 30, 40
 
+=======
+            frame_0, frame_T = 6, 8
+>>>>>>> 233b85159c7a3b5d0fcf2b893bfbb89d9c4ee693
         elif self.dataset_name == "nbody_small_out_dist":
             frame_0, frame_T = 20, 30
 
