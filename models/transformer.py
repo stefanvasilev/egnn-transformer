@@ -353,9 +353,9 @@ class EGNNTransformer(nn.Module):
     def __call__(self, edge_inputs, node_inputs, cross_mask=None, train=True):
 
         batch_size, _, _ = node_inputs.shape
-
+        _, _, num_edge_features = edge_inputs.shape
         # Input layer
-        edge_inputs, pos_encoding = jnp.array_split(edge_inputs, axis=-1)
+        edge_inputs, pos_encoding = edge_inputs[:, :, :num_edge_features-1], edge_inputs[:, :, num_edge_features-1:]
         edge_inputs = self.input_dropout(edge_inputs, deterministic=not train)
         edge_encoded = self.input_layer_edges(edge_inputs)
         if self.use_pos:
