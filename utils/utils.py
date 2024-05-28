@@ -155,10 +155,6 @@ def get_model(args: Namespace) -> nn.Module:
             out_node_nf=num_out,
             n_layers=args.num_layers,
         )
-<<<<<<< HEAD
-    elif args.model_name == 'transformer':
-
-=======
     elif args.model_name == "egnn_vel":
         from models.egnn_jax import EGNN_vel
 
@@ -168,7 +164,6 @@ def get_model(args: Namespace) -> nn.Module:
             n_layers=args.num_layers)
 
     elif args.model_name == "transformer" or args.model_name == "invariant_transformer":
->>>>>>> 233b85159c7a3b5d0fcf2b893bfbb89d9c4ee693
         from models.transformer import EGNNTransformer
 
         if args.model_name == "invariant_transformer":
@@ -179,7 +174,6 @@ def get_model(args: Namespace) -> nn.Module:
         model = EGNNTransformer(
             num_edge_encoder_blocks=args.num_edge_encoders,
             num_node_encoder_blocks=args.num_node_encoders,
-<<<<<<< HEAD
             num_combined_encoder_blocks=args.num_combined_encoder_blocks,
             model_dim=args.dim,
             num_heads=args.heads,
@@ -187,17 +181,11 @@ def get_model(args: Namespace) -> nn.Module:
             edge_input_dim=args.edge_input_dim,
             node_input_dim=args.node_input_dim,
             use_pos=args.use_pos,
-=======
-            num_combined_encoder_blocks= args.num_combined_encoder_blocks,
-            model_dim=args.dim,
-            num_heads=args.heads,
-            dropout_prob=args.dropout,
             predict_pos=predict_pos,
             n_nodes=n_nodes,
             velocity=velocity,
             node_only=node_only,
             invariant_pos=invariance,
->>>>>>> 233b85159c7a3b5d0fcf2b893bfbb89d9c4ee693
         )
 
     else:
