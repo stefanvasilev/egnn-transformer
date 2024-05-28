@@ -327,6 +327,22 @@ class EGNNTransformer(nn.Module):
                     dropout_prob=self.dropout_prob,
                 )
 
+            # Combined Encoder
+            self.combined_encoder = TransformerEncoder(
+                num_layers=self.num_combined_encoder_blocks,
+                input_dim=self.model_dim,
+                num_heads=self.num_heads,
+                dim_feedforward=self.model_dim,
+                dropout_prob=self.dropout_prob,
+            )
+
+            # Cross Attention
+            self.cross_attention = MultiHeadCrossAttention(
+                embed_dim=self.model_dim,
+                num_heads=self.num_heads,
+            )
+
+
     def __call__(self, node_inputs, edge_inputs, coords, vel, cross_mask=None, train=True):
 
         batch_size, _, num_node_features = node_inputs.shape
