@@ -200,7 +200,13 @@ if __name__ == "__main__":
         help="Which n_body dataset to use",
         choices=["nbody", "nbody_small"],
     )
-
+    parser.add_argument(
+        "--equivariance",
+        type=str,
+        default="translation",
+        help="type of equivariance",
+        choices=["not_equivariant", "translation", "roto_translation", "velo_roto_translation"],
+    )
     # Model parameters
     parser.add_argument("--num_edge_encoders", type=int, default=3, help="Number of edge encoder blocks")
     parser.add_argument("--num_node_encoders", type=int, default=3, help="Number of node encoder blocks")
