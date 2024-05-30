@@ -210,6 +210,7 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout probability")
     parser.add_argument("--edge_input_dim", type=int, default=6, help="Dimension of the edge input")
     parser.add_argument("--node_input_dim", type=int, default=11, help="Dimension of the node input")
+    parser.add_argument("--node_only", action="store_true", help="Use only node features")
 
     parser.add_argument("--model_name", type=str, default="transformer", help="Model name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
