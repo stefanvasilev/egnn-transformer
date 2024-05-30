@@ -139,15 +139,16 @@ def train_model(args, model, model_name, checkpoint_path):
         if epoch % args.val_freq == 0:
             val_loss = evaluate(val_loader, params, rng, model.apply, property_idx, meann=meann, mad=mad)
             val_loss_item = float(jax.device_get(val_loss))
-            val_scores.append(val_loss_item)
             print(f"[Epoch {epoch + 1:2d}] Training loss: {train_loss:.6f}, Validation loss: {val_loss_item:.6f}")
             writer.add_scalar('Loss/val', val_loss_item, global_step=global_step)
             if len(val_scores) == 1 or val_loss < min(val_scores):
                 print("\t   (New best performance, saving model...)")
                 save_model(params, checkpoint_path, model_name)
-                best_val_epoch = len(val_scores) - 1
+                best_val_epoch = len(epoch)
                 test_loss = evaluate(test_loader, params, rng, model.apply, property_idx, meann=meann, mad=mad)
                 #jax.clear_caches()
+            
+            val_scores.append(val_loss_item)
 
     if val_scores:
         best_val_epoch = val_scores.index(min(val_scores))
