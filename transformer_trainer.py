@@ -36,10 +36,10 @@ def _get_result_file(model_path, model_name):
     return os.path.join(model_path, model_name + "_results.json")
 
 @partial(jax.jit, static_argnames=["opt_update", "model_fn"])
-def update(params, edge_attr, node_attr, cross_mask, target, opt_state, rng, model_fn, opt_update):
+def update(params, edge_attr, node_attr, cross_mask, target, opt_state, rng, model_fn, meann, mad, opt_update):
     rng, dropout_rng = jax.random.split(rng)
-    grads = jax.grad(loss_fn)(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
-    loss = loss_fn(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, training=True)
+    grads = jax.grad(loss_fn)(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=meann, mad=mad)
+    loss = loss_fn(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=meann, mad=mad, training=True)
     updates, opt_state = opt_update(grads, opt_state, params)
     return loss, optax.apply_updates(params, updates), opt_state, rng
 
@@ -121,7 +121,7 @@ def train_model(args, model, model_name, checkpoint_path):
             #node_attr = handle_nan(node_attr)
             #target = handle_nan(target)
             
-            loss, params, opt_state, rng = update(params=params, edge_attr=edge_attr, node_attr=node_attr, cross_mask=cross_mask, target=target, opt_state=opt_state, rng=rng, model_fn=model.apply, opt_update=opt_update)
+            loss, params, opt_state, rng = update(params=params, edge_attr=edge_attr, node_attr=node_attr, cross_mask=cross_mask, target=target, opt_state=opt_state, rng=rng, model_fn=model.apply, meann=meann, mad=mad, opt_update=opt_update)
             loss_item = float(jax.device_get(loss))
             train_loss += loss_item
             writer.add_scalar('Loss/train', loss_item, global_step=global_step)
