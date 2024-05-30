@@ -38,13 +38,13 @@ def _get_result_file(model_path, model_name):
 @partial(jax.jit, static_argnames=["opt_update", "model_fn"])
 def update(params, edge_attr, node_attr, cross_mask, target, opt_state, rng, model_fn, opt_update):
     rng, dropout_rng = jax.random.split(rng)
-    grads = jax.grad(loss)(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
-    loss = loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, training=True)
+    grads = jax.grad(loss_fn)(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
+    loss = loss_fn(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, training=True)
     updates, opt_state = opt_update(grads, opt_state, params)
     return loss, optax.apply_updates(params, updates), opt_state, rng
 
 #use jit again? removed for debugging
-def loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=None, mad=None, training=False):
+def loss_fn(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=None, mad=None, training=False):
     variables = {'params': params}
     rngs = {'dropout': dropout_rng}
     if not training:
@@ -80,7 +80,7 @@ def evaluate(loader, params, rng, model_fn, property_idx, meann, mad):
         #target = handle_nan(target)
 
         _, dropout_rng = jax.random.split(rng)
-        loss = loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=meann, mad=mad, training=False)
+        loss = loss_fn(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=meann, mad=mad, training=False)
         eval_loss += loss
     return eval_loss / num_batches
 
