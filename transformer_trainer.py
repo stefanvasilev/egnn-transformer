@@ -8,7 +8,7 @@ from tqdm import tqdm
 from flax.training import checkpoints
 from functools import partial
 from qm9.utils import GraphTransform
-from utils.utils import get_model, set_seed, NodeDistance, RemoveNumHs, get_loaders_and_statistics, get_property_index
+from utils.utils import get_model, set_seed, NodeDistance, RemoveNumHs, get_loaders_and_statistics, get_property_index, denormalize
 import gc
 import json
 from torch_geometric.datasets import QM9
@@ -38,31 +38,31 @@ def _get_result_file(model_path, model_name):
 @partial(jax.jit, static_argnames=["opt_update", "model_fn"])
 def update(params, edge_attr, node_attr, cross_mask, target, opt_state, rng, model_fn, opt_update):
     rng, dropout_rng = jax.random.split(rng)
-    grads = jax.grad(mse_loss)(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
-    loss = mse_loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
+    grads = jax.grad(loss)(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
+    loss = loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, training=True)
     updates, opt_state = opt_update(grads, opt_state, params)
     return loss, optax.apply_updates(params, updates), opt_state, rng
 
 #use jit again? removed for debugging
-def mse_loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn):
+def loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=None, mad=None, training=False):
     variables = {'params': params}
     rngs = {'dropout': dropout_rng}
-    pred = model_fn(variables, node_attr, edge_attr, None, None, cross_mask=cross_mask, train=True, rngs=rngs)
-
-    return jnp.mean((pred - target) ** 2)
-
-def normalize_data(data):
-    """Normalize data for better training stability."""
-    mean = jnp.mean(data, axis=0)
-    std = jnp.std(data, axis=0)
-    return (data - mean) / std
+    if not training:
+        pred = jax.lax.stop_gradient(model_fn(variables, node_attr, edge_attr, None, None, cross_mask=cross_mask, train=True, rngs=rngs))
+        loss = jnp.mean((pred - target) ** 2)
+    else:
+        pred = model_fn(variables, node_attr, edge_attr, None, None, cross_mask=cross_mask, train=True, rngs=rngs)
+        pred = denormalize(pred, meann, mad)
+        target = denormalize(target, meann, mad)
+        loss = jnp.mean(jnp.abs(pred - target))
+    return loss
 
 def handle_nan(data):
     """Replace nan and inf values with 0."""
     data = jnp.nan_to_num(data, pos_inf=0, neg_inf=0)
     return data
 
-def evaluate(loader, params, rng, model_fn, property_idx):
+def evaluate(loader, params, rng, model_fn, property_idx, meann, mad):
     eval_loss = 0.0
     num_batches = len(loader)
     
@@ -80,7 +80,7 @@ def evaluate(loader, params, rng, model_fn, property_idx):
         #target = handle_nan(target)
 
         _, dropout_rng = jax.random.split(rng)
-        loss = mse_loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn)
+        loss = loss(params, edge_attr, node_attr, cross_mask, target, dropout_rng, model_fn, meann=meann, mad=mad, training=False)
         eval_loss += loss
     return eval_loss / num_batches
 
@@ -98,7 +98,9 @@ def train_model(args, model, model_name, checkpoint_path):
     property_idx = get_property_index(args.property)
 
     init_node_attr, init_edge_attr, edge_attn_mask, x, y = next(iter(train_loader))
-    opt_init, opt_update = optax.adamw(learning_rate=args.lr, weight_decay=args.weight_decay)
+    # Cosine annealing learning rate scheduler
+    scheduler = optax.cosine_decay_schedule(init_value=args.lr, decay_steps=args.epochs * len(train_loader))
+    opt_init, opt_update = optax.adamw(learning_rate=scheduler, weight_decay=args.weight_decay)
     rng, init_rng = jax.random.split(jax_seed)
     params = model.init(init_rng, init_node_attr, init_edge_attr, coords=None, vel=None, cross_mask=edge_attn_mask)['params']
     opt_state = opt_init(params)
@@ -125,8 +127,8 @@ def train_model(args, model, model_name, checkpoint_path):
             writer.add_scalar('Loss/train', loss_item, global_step=global_step)
 
             # Manually trigger garbage collection
-            gc.collect()
-            jax.clear_caches()
+            #gc.collect()
+            #jax.clear_caches()
             
             global_step += 1
 
@@ -135,7 +137,7 @@ def train_model(args, model, model_name, checkpoint_path):
         writer.add_scalar('AvgLoss/train', train_loss, global_step=global_step)
 
         if epoch % args.val_freq == 0:
-            val_loss = evaluate(val_loader, params, rng, model.apply, property_idx)
+            val_loss = evaluate(val_loader, params, rng, model.apply, property_idx, meann=meann, mad=mad)
             val_loss_item = float(jax.device_get(val_loss))
             val_scores.append(val_loss_item)
             print(f"[Epoch {epoch + 1:2d}] Training loss: {train_loss:.6f}, Validation loss: {val_loss_item:.6f}")
@@ -144,8 +146,8 @@ def train_model(args, model, model_name, checkpoint_path):
                 print("\t   (New best performance, saving model...)")
                 save_model(params, checkpoint_path, model_name)
                 best_val_epoch = len(val_scores) - 1
-                test_loss = evaluate(test_loader, params, rng, model.apply, property_idx)
-                jax.clear_caches()
+                test_loss = evaluate(test_loader, params, rng, model.apply, property_idx, meann=meann, mad=mad)
+                #jax.clear_caches()
 
     if val_scores:
         best_val_epoch = val_scores.index(min(val_scores))
