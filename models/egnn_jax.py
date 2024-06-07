@@ -35,8 +35,10 @@ class E_GCL(nn.Module):
             ]
         )
 
-        out = jnp.concatenate([source, target, radial, edge_attr], axis=1)
-
+        if edge_attr:
+            out = jnp.concatenate([source, target, radial, edge_attr], axis=1)
+        else:
+            out = jnp.concatenate([source, target, radial], axis=1)
         return edge_mlp(out)
 
     def node_model(self, edge_index, edge_attr, x):
@@ -90,7 +92,7 @@ class E_GCL(nn.Module):
     def __call__(self, h, edge_index, coord, vel=None, edge_attr=None):
         m_ij = self.edge_model(edge_index, h, coord, edge_attr)
         h, agg = self.node_model(edge_index, m_ij, h)
-        coord = self.coord_model(edge_index, m_ij, coord)
+        #coord = self.coord_model(edge_index, m_ij, coord)
         if self.velocity:
             coord = self.coord_vel_model(coord, h, vel)
         return h, coord, m_ij
@@ -99,7 +101,7 @@ class E_GCL(nn.Module):
 class EGNN_equiv(nn.Module):
     hidden_nf: int
     out_node_nf: int
-    act_fn: callable = nn.silu  # default activation function
+    act_fn: callable = nn.relu  # default activation function
     n_layers: int = 4
     velocity: bool = False
 
@@ -116,7 +118,7 @@ class EGNN_equiv(nn.Module):
 class EGNN_QM9(nn.Module):
     hidden_nf: int
     out_node_nf: int
-    act_fn: callable = nn.silu  # default activation function
+    act_fn: callable = nn.relu  # default activation function
     n_layers: int = 4
 
     @nn.compact

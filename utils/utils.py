@@ -56,7 +56,7 @@ def get_collate_fn_egnn_transformer(meann, mad, max_num_nodes, max_num_edges):
         x = pad_sequence(x, batch_first=True, padding_value=0.0)
 
         # Normalize target
-        y = torch.stack([normalize(d.y, meann, mad) for d in data_list]).squeeze(1)
+        y = torch.stack([d.y for d in data_list]).squeeze(1)
 
         edge_index = []
         start_idx = 0

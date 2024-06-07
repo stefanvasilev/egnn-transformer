@@ -14,7 +14,7 @@ from typing import Callable
 from utils.utils import get_model, get_loaders_and_statistics, set_seed, get_property_index, denormalize, normalize
 import gc
 from torch.utils.tensorboard import SummaryWriter
-
+from datetime import datetime
 
 # Seeding
 jax_seed = jax.random.PRNGKey(42)
@@ -37,7 +37,7 @@ def _get_result_file(model_path, model_name):
 
 @partial(jax.jit, static_argnames=["loss_fn", "opt_update", "max_num_nodes"])
 def update(params, x, edge_attr, edge_index, pos, node_mask, max_num_nodes, target, opt_state, loss_fn, opt_update):
-    #using jax grad only instead of value and grad
+    # Using jax grad only instead of value and grad
     grads = jax.grad(loss_fn)(params, x, edge_attr, edge_index, pos, node_mask, max_num_nodes, target)
     loss = loss_fn(params, x, edge_attr, edge_index, pos, node_mask, max_num_nodes, target)
     updates, opt_state = opt_update(grads, opt_state, params)
@@ -47,19 +47,23 @@ def update(params, x, edge_attr, edge_index, pos, node_mask, max_num_nodes, targ
 def l1_loss(params, h, edge_attr, edge_index, pos, node_mask, max_num_nodes, 
             target, model_fn, meann, mad, training=True, task="graph"):
     """
-    Logic is : while training normalize the targets (we do this in collate)
+    Logic is: while training normalize the targets (we do this in collate)
                while evaluating denormalize the predictions
                we denormalize the target too because we normalize it in collate
     """
     if not training:
         pred = jax.lax.stop_gradient(model_fn(params, h, pos, edge_index, edge_attr, node_mask, max_num_nodes)[0])
-        pred = denormalize(pred, meann, mad)
-        target = denormalize(target, meann, mad)
+        pred = mad * pred + meann
+        #pred = denormalize(pred, meann, mad)
+        #target = denormalize(target, meann, mad)
     else:
         pred = model_fn(params, h, pos, edge_index, edge_attr, node_mask, max_num_nodes)[0]
+        target = (target - meann)/ mad
+
+    pred = jnp.where(jnp.isnan(pred), 0.0, pred)  # Replace nan with 0.0 in predictions
+    target = jnp.where(jnp.isnan(target), 0.0, target)  # Replace nan with 0.0 in targets
 
     assert pred.shape == target.shape, f"Shape mismatch: pred.shape = {pred.shape}, target_padded.shape = {target.shape}"
-    # TODO no_grad for training = false
     return jnp.mean(jnp.abs(pred - target))
 
 def evaluate(loader, params, max_num_nodes, loss_fn, graph_transform, meann, mad, task="graph"):
@@ -68,7 +72,6 @@ def evaluate(loader, params, max_num_nodes, loss_fn, graph_transform, meann, mad
         feat, target = graph_transform(data)
         h, x, edges, edge_attr, node_mask = feat
         loss = loss_fn(params, h, edge_attr, edges, x, node_mask, max_num_nodes, target, meann=meann, mad=mad, training=False)
-        #loss = loss_fn(params, h, edge_attr, edges, x, target, node_mask=node_mask, max_num_nodes=max_num_nodes, meann=meann, mad=mad, training=False)
         eval_loss += loss
     return eval_loss / len(loader)
 
@@ -86,7 +89,7 @@ def train_model(args, model, graph_transform, model_name, checkpoint_path):
     property_idx = get_property_index(args.property)
     graph_transform_fn = graph_transform(property_idx)
 
-    mad = jnp.maximum(mad, 1e-6) #to not divide by zero
+    mad = jnp.maximum(mad, 1e-6) # To not divide by zero
     print(f"Mean: {meann}, MAD: {mad}")
 
     init_feat, _ = graph_transform_fn(next(iter(train_loader)))
@@ -112,6 +115,7 @@ def train_model(args, model, graph_transform, model_name, checkpoint_path):
             x, pos, edge_index, edge_attr, node_mask = feat
             loss, params, opt_state = update_fn(params, x, edge_attr, edge_index, pos, node_mask, max_num_nodes, target=target, opt_state=opt_state)
             loss_item = float(jax.device_get(loss))
+            #print(f' loss now is > {loss_item}')
             train_loss += loss_item
             writer.add_scalar('Loss/train', loss_item, global_step=global_step)
 
@@ -170,7 +174,6 @@ def train_model(args, model, graph_transform, model_name, checkpoint_path):
 
     return
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Run parameters
@@ -178,10 +181,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=1024,
+        default=96,
         help="Batch size (number of graphs).",
     )
-    parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument(
         "--lr-scheduling",
         action="store_true",
@@ -190,13 +193,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--weight_decay",
         type=float,
-        default=1e-8,
+        default=1e-16,
         help="Weight decay",
     )
     parser.add_argument(
         "--val_freq",
         type=int,
-        default=10,
+        default=1,
         help="Evaluation frequency (number of epochs)",
     )
 
@@ -221,7 +224,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_layers",
         type=int,
-        default=3,
+        default=7,
         help="Number of message passing layers",
     )
     parser.add_argument(
@@ -252,7 +255,9 @@ if __name__ == "__main__":
 
     graph_transform = TransformDLBatches
 
-    writer = SummaryWriter(log_dir="runs", flush_secs=10)
+    # Unique log directory for TensorBoard
+    log_dir = os.path.join("runs", f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    writer = SummaryWriter(log_dir=log_dir, flush_secs=10)
 
     model = get_model(parsed_args)
     train_model(parsed_args, model, graph_transform, "qm9_EGNN", "assets")
