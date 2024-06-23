@@ -170,7 +170,7 @@ To reproduce the EGNN model \[7\], we rewrote the entire model from scratch in J
   <tr align="center">
     <td align="left"> QM9 (ε<sub>HOMO</sub>) (meV)</td>
     <td align="left">29</td>
-    <td align="left">275*</td>
+    <td align="left">75</td>
   </tr>
   <tr align="center">
     <td align="left">N-Body (Position MSE)</td>
@@ -181,8 +181,6 @@ To reproduce the EGNN model \[7\], we rewrote the entire model from scratch in J
     <td colspan=6><b>Table 1.</b> Reproduction results comparing [5] with our Jax implementation.</td>
   </tr>
 </table>
-
-<sup>*Currently, the result is influenced by the large batch size, causing it to not learn the specific molecule properties well.</sup>
 
 Here we can see, that our EGNN implementation outperforms the original author's implementation on the N-Body dataset. Using other publicly available EGNN implementations, also achieve a similar performance as our model on our data. We argue therefore, that the increased performance, comes from the fact, that the dataset is generated slightly different to the one presented in \[5\].
 
